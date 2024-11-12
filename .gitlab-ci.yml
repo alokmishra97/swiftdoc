@@ -1,0 +1,36 @@
+# .gitlab-ci.yml
+
+stages:
+  - build
+  - test
+  - deploy
+
+# Job to build the Docker image
+build:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - docker build -t hoewarmishetindelft .
+  only:
+    - main
+
+# Job to run the unit tests
+test:
+  stage: test
+  image: python:3.10-slim
+  script:
+    - pip install -r requirements.txt
+    - pytest tests/
+  only:
+    - main
+
+# Job to run the Docker container after building it
+deploy:
+  stage: deploy
+  image: docker:latest
+  script:
+    - docker run --rm hoewarmishetindelft
+  only:
+    - main
