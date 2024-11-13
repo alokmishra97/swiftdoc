@@ -17,7 +17,7 @@ class TemperatureScraper:
         # Parse the HTML content using BeautifulSoup
         soup = BeautifulSoup(response.content, 'html.parser')
 
-        # Find the element containing the temperature. (Update this to match actual HTML structure)
+        # Find the element containing the temperature.
         temperature_element = soup.find('span', {'class': 'temp'})
 
         if not temperature_element:
