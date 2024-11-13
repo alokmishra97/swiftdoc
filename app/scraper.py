@@ -12,7 +12,7 @@ class TemperatureScraper:
         self.url = url
 
     def fetch_temperature(self):
-        # Setup WebDriver for Selenium (you can use other browsers like Firefox)
+        # Setup WebDriver for Selenium 
         options = webdriver.ChromeOptions()
         options.add_argument('--headless')  # Run in headless mode (no UI)
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
