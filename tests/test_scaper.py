@@ -4,47 +4,81 @@ from app.scraper import TemperatureScraper
 
 
 class TestTemperatureScraper(unittest.TestCase):
-    @patch('app.scraper.requests.get')
-    def test_fetch_temperature_success(self, mock_get):
-        # Mock the HTTP response
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b'<html><span class="temp">18.3°C</span></html>'
-        mock_get.return_value = mock_response
 
-        scraper = TemperatureScraper('http://www.weerindelft.nl/')
+    @patch('selenium.webdriver.Chrome')  # Mock the Chrome WebDriver
+    def test_fetch_temperature_success(self, MockWebDriver):
+        # Create a mock driver instance
+        mock_driver = MagicMock()
+        MockWebDriver.return_value = mock_driver
+
+        
+        mock_driver.get.return_value = None 
+        mock_driver.find_element.return_value = MagicMock()  # Mock the element
+
+        
+        mock_wait = MagicMock()
+        mock_wait.until.return_value = MagicMock(text="20.5°C")  
+        mock_driver.switch_to.frame.return_value = None  
+
+        # Create an instance of the scraper
+        scraper = TemperatureScraper(url="http://www.weerindelft.nl/")
+
+        # Call the fetch_temperature method
         temperature = scraper.fetch_temperature()
 
-        # Check if the temperature is correctly parsed
-        self.assertEqual(temperature, 18.3)
+        # Assert the temperature is correctly parsed
+        self.assertEqual(temperature, 20.5) 
+        mock_driver.quit.assert_called_once()  
 
-    @patch('app.scraper.requests.get')
-    def test_fetch_temperature_failure(self, mock_get):
-        # Mock a failed HTTP request
-        mock_response = MagicMock()
-        mock_response.status_code = 404
-        mock_get.return_value = mock_response
+    @patch('selenium.webdriver.Chrome')  
+    def test_fetch_temperature_with_iframe(self, MockWebDriver):
+        
+        mock_driver = MagicMock()
+        MockWebDriver.return_value = mock_driver
 
-        scraper = TemperatureScraper('http://www.weerindelft.nl/')
+       
+        mock_driver.get.return_value = None  # Don't actually navigate to a URL
+        mock_driver.find_element.return_value = MagicMock()  # Mock the element
 
-        # Ensure that an exception is raised when HTTP request fails
+        
+        iframe_mock = MagicMock()
+        mock_driver.find_element.return_value = iframe_mock  # Return iframe mock
+
+        
+        mock_wait = MagicMock()
+        mock_wait.until.return_value = MagicMock(text="22.0°C")  # Simulate the text of the temperature element
+        mock_driver.switch_to.frame.return_value = None  # Mock the iframe switching
+
+        
+        scraper = TemperatureScraper(url="http://www.weerindelft.nl/")
+
+        
+        temperature = scraper.fetch_temperature()
+
+       
+        self.assertEqual(temperature, 22.0)  
+        mock_driver.switch_to.frame.assert_called_once()  
+        mock_driver.quit.assert_called_once()  
+
+    @patch('selenium.webdriver.Chrome')  
+    def test_fetch_temperature_failure(self, MockWebDriver):
+        # Create a mock driver instance
+        mock_driver = MagicMock()
+        MockWebDriver.return_value = mock_driver
+
+        # Simulate failure: WebDriver can't find the temperature element
+        mock_driver.get.return_value = None  
+        mock_driver.find_element.side_effect = Exception(
+            "Element not found")  # Force an exception when finding elements
+
+        
+        scraper = TemperatureScraper(url="http://www.weerindelft.nl/")
+
+        # Test that an exception is raised when the element can't be found
         with self.assertRaises(Exception) as context:
             scraper.fetch_temperature()
 
-        self.assertTrue('Failed to retrieve data from the website' in str(context.exception))
+        self.assertTrue(
+            "Error retrieving temperature" in str(context.exception))  # Check if the correct error message was raised
+        mock_driver.quit.assert_called_once()  # Ensure the browser is closed even on failure
 
-    @patch('app.scraper.requests.get')
-    def test_parse_temperature_missing_element(self, mock_get):
-        # Mock a valid HTTP response, but without the temperature element
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.content = b'<html><span>No Temperature Data</span></html>'
-        mock_get.return_value = mock_response
-
-        scraper = TemperatureScraper('http://www.weerindelft.nl/')
-
-        # Ensure an exception is raised if the temperature element is missing
-        with self.assertRaises(Exception) as context:
-            scraper.fetch_temperature()
-
-        self.assertTrue('Could not find the temperature element on the page' in str(context.exception))
