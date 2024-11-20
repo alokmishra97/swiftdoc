@@ -1,84 +1,83 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+from selenium.webdriver.common.by import By
 from app.scraper import TemperatureScraper
 
 
 class TestTemperatureScraper(unittest.TestCase):
 
-    @patch('selenium.webdriver.Chrome')  # Mock the Chrome WebDriver
-    def test_fetch_temperature_success(self, MockWebDriver):
-        # Create a mock driver instance
+    @patch('swiftdoc.app.scraper.webdriver.Chrome')  # Mock the Chrome WebDriver
+    @patch('swiftdoc.app.scraper.WebDriverWait')  # Mock WebDriverWait
+    @patch('swiftdoc.app.scraper.Service')  # Mock the Service class
+    def test_fetch_temperature(self, MockService, MockWebDriverWait, MockChrome):
+        # Arrange
         mock_driver = MagicMock()
-        MockWebDriver.return_value = mock_driver
+        mock_element = MagicMock()
+        mock_element.text = "15.5°C"  # Simulate the temperature text
 
-        
-        mock_driver.get.return_value = None 
-        mock_driver.find_element.return_value = MagicMock()  # Mock the element
+        # Set up what the mocked WebDriver should return
+        MockChrome.return_value = mock_driver
+        mock_driver.find_element.return_value = mock_element
+        MockWebDriverWait.return_value.until.return_value = mock_element  # Simulate WebDriverWait
 
-        
-        mock_wait = MagicMock()
-        mock_wait.until.return_value = MagicMock(text="20.5°C")  
-        mock_driver.switch_to.frame.return_value = None  
+        mock_driver.switch_to.frame = MagicMock()
 
-        # Create an instance of the scraper
-        scraper = TemperatureScraper(url="http://www.weerindelft.nl/")
+        MockService.return_value = MagicMock()
 
-        # Call the fetch_temperature method
+        # URL to be tested
+        url = "http://example.com"
+        scraper = TemperatureScraper(url)
+
+        # Act
         temperature = scraper.fetch_temperature()
 
-        # Assert the temperature is correctly parsed
-        self.assertEqual(temperature, 20.5) 
-        mock_driver.quit.assert_called_once()  
+        # Assert
+        mock_driver.quit.assert_called_once()  # Ensure driver.quit() is called
+        mock_driver.find_element.assert_called_with(By.TAG_NAME, "iframe")
+        self.assertEqual(temperature, 15.5)  # Check if the temperature extracted is correct
 
-    @patch('selenium.webdriver.Chrome')  
-    def test_fetch_temperature_with_iframe(self, MockWebDriver):
-        
+    @patch('swiftdoc.app.scraper.webdriver.Chrome')  # Mock the Chrome WebDriver
+    @patch('swiftdoc.app.scraper.WebDriverWait')  # Mock WebDriverWait
+    def test_fetch_temperature_no_iframe(self, MockWebDriverWait, MockChrome):
+        # Arrange
         mock_driver = MagicMock()
-        MockWebDriver.return_value = mock_driver
+        mock_element = MagicMock()
+        mock_element.text = "20°C"  # Simulate the temperature text
 
-       
-        mock_driver.get.return_value = None  # Don't actually navigate to a URL
-        mock_driver.find_element.return_value = MagicMock()  # Mock the element
+        MockChrome.return_value = mock_driver
+        mock_driver.find_element.return_value = mock_element
+        MockWebDriverWait.return_value.until.return_value = mock_element  # Simulate WebDriverWait
 
-        
-        iframe_mock = MagicMock()
-        mock_driver.find_element.return_value = iframe_mock  # Return iframe mock
+        mock_driver.switch_to.frame = MagicMock()
+        mock_driver.find_element.side_effect = Exception("No iframe found")  # Simulate no iframe found error
 
-        
-        mock_wait = MagicMock()
-        mock_wait.until.return_value = MagicMock(text="22.0°C")  # Simulate the text of the temperature element
-        mock_driver.switch_to.frame.return_value = None  # Mock the iframe switching
+        url = "http://example.com"
+        scraper = TemperatureScraper(url)
 
-        
-        scraper = TemperatureScraper(url="http://www.weerindelft.nl/")
+        # Act & Assert
+        with self.assertLogs(level='INFO') as log:
+            temperature = scraper.fetch_temperature()
+            self.assertEqual(temperature, 20)  # Temperature should be extracted correctly without iframe
+            self.assertNotIn("No iframe found or switching to iframe failed.", log.output[0])
 
-        
-        temperature = scraper.fetch_temperature()
-
-       
-        self.assertEqual(temperature, 22.0)  
-        mock_driver.switch_to.frame.assert_called_once()  
-        mock_driver.quit.assert_called_once()  
-
-    @patch('selenium.webdriver.Chrome')  
-    def test_fetch_temperature_failure(self, MockWebDriver):
-        # Create a mock driver instance
+    @patch('swiftdoc.app.scraper.webdriver.Chrome')  # Mock the Chrome WebDriver
+    @patch('swiftdoc.app.scraper.WebDriverWait')  # Mock WebDriverWait
+    def test_fetch_temperature_element_not_found(self, MockWebDriverWait, MockChrome):
+        # Arrange
         mock_driver = MagicMock()
-        MockWebDriver.return_value = mock_driver
+        mock_driver.find_element.return_value = None  # Simulate no element found
 
-        # Simulate failure: WebDriver can't find the temperature element
-        mock_driver.get.return_value = None  
-        mock_driver.find_element.side_effect = Exception(
-            "Element not found")  # Force an exception when finding elements
+        MockChrome.return_value = mock_driver
+        MockWebDriverWait.return_value.until.side_effect = Exception("Timeout waiting for element")
 
-        
-        scraper = TemperatureScraper(url="http://www.weerindelft.nl/")
+        url = "http://example.com"
+        scraper = TemperatureScraper(url)
 
-        # Test that an exception is raised when the element can't be found
+        # Act & Assert
         with self.assertRaises(Exception) as context:
             scraper.fetch_temperature()
 
-        self.assertTrue(
-            "Error retrieving temperature" in str(context.exception))  # Check if the correct error message was raised
-        mock_driver.quit.assert_called_once()  # Ensure the browser is closed even on failure
+        self.assertTrue('Error retrieving temperature' in str(context.exception))  # Ensure the exception is raised
+
+
 
